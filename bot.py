@@ -6,6 +6,7 @@ from solders.pubkey import Pubkey
 
 # ===== CONFIG =====
 RPC_URL = "https://mainnet.helius-rpc.com/?api-key=afa7a395-7f7f-41aa-a5cb-90b81aae7290"
+HELIUS_API_KEY = "afa7a395-7f7f-41aa-a5cb-90b81aae7290"
 BOT_TOKEN = "8779218583:AAGNpgOjvgJr9dw99rm4sY0wU3Uexpw5v9g"
 CHAT_ID = -1003795346383
 
@@ -38,6 +39,22 @@ def get_token_name(mint):
         pass
     return "Unknown"
 
+# ===== HELIUS PARSED TX =====
+def get_parsed_tx(signature):
+    url = f"https://api.helius.xyz/v0/transactions/?api-key={HELIUS_API_KEY}"
+
+    try:
+        res = requests.post(url, json={
+            "transactions": [signature]
+        }).json()
+
+        if res and len(res) > 0:
+            return res[0]
+    except Exception as e:
+        print("Helius error:", e)
+
+    return None
+
 # ===== COMMAND HANDLER (FIXED OFFSET) =====
 def handle_commands():
     global last_update_id
@@ -51,7 +68,7 @@ def handle_commands():
 
             for update in data["result"]:
                 update_id = update["update_id"]
-                last_update_id = update_id  # ✅ prevents repeating
+                last_update_id = update_id
 
                 if "message" not in update:
                     continue
@@ -64,7 +81,6 @@ def handle_commands():
                 text = message.get("text", "")
                 print("Received:", text)
 
-                # ===== /track =====
                 if text.startswith("/track"):
                     parts = text.split()
 
@@ -91,7 +107,6 @@ def handle_commands():
                     tracked_wallets.append(wallet)
                     send_message(f"✅ Tracking:\n{wallet_str}")
 
-                # ===== /remove =====
                 elif text.startswith("/remove"):
                     parts = text.split()
 
@@ -114,7 +129,6 @@ def handle_commands():
                     tracked_wallets.remove(wallet)
                     send_message(f"🗑 Removed:\n{wallet_str}")
 
-                # ===== /list =====
                 elif text == "/list":
                     if not tracked_wallets:
                         send_message("📭 No wallets")
@@ -129,40 +143,34 @@ def handle_commands():
 
         time.sleep(2)
 
-# ===== 🔥 CLAIM DETECTION (ACCURATE) =====
-def parse_fee_claim(tx_data, wallet):
+# ===== 🔥 FINAL CLAIM DETECTION =====
+def parse_fee_claim(signature, wallet):
+    tx = get_parsed_tx(signature)
+
+    if not tx:
+        return None
+
     try:
-        meta = tx_data.transaction.meta
-        message = tx_data.transaction.transaction.message
+        # ✅ RELIABLE detection
+        tx_type = tx.get("type", "")
 
-        logs = meta.log_messages
+        if "CLAIM" not in tx_type.upper():
+            return None
 
-        if logs:
-            for log in logs:
-                log_lower = log.lower()
+        # ✅ SOL received
+        for transfer in tx.get("nativeTransfers", []):
+            if transfer.get("toUserAccount") == str(wallet):
 
-                # 🎯 precise detection
-                if "claim_social_fee" in log_lower or "claim_social_fee_pda" in log_lower:
+                sol_amount = transfer.get("amount", 0) / 1e9
 
-                    pre = meta.pre_balances
-                    post = meta.post_balances
-                    keys = message.account_keys
+                mint = "Unknown"
+                name = "Unknown"
 
-                    for i, acc in enumerate(keys):
-                        if str(acc) == str(wallet):
-                            diff = post[i] - pre[i]
+                if tx.get("tokenTransfers"):
+                    mint = tx["tokenTransfers"][0].get("mint", "Unknown")
+                    name = get_token_name(mint)
 
-                            if diff > 0:
-                                sol_amount = diff / 1e9
-
-                                mint = "Unknown"
-                                name = "Unknown"
-
-                                if meta.post_token_balances:
-                                    mint = meta.post_token_balances[0].mint
-                                    name = get_token_name(mint)
-
-                                return sol_amount, mint, name
+                return sol_amount, mint, name
 
     except Exception as e:
         print("Parse error:", e)
@@ -189,15 +197,7 @@ def track_wallets():
 
                     seen_txs.add(sig)
 
-                    try:
-                        tx_data = client.get_transaction(sig)
-                    except:
-                        continue
-
-                    if not tx_data.value:
-                        continue
-
-                    result = parse_fee_claim(tx_data.value, wallet)
+                    result = parse_fee_claim(sig, wallet)
 
                     if result:
                         sol, mint, name = result
@@ -220,4 +220,4 @@ def track_wallets():
 threading.Thread(target=handle_commands).start()
 threading.Thread(target=track_wallets).start()
 
-print("🔥 BOT LIVE (PRO MODE)")
+print("🔥 BOT LIVE (HELIUS MODE)")
