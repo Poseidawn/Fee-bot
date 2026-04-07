@@ -1,17 +1,16 @@
 import time
 import requests
 import threading
+import os
 from solana.rpc.api import Client
 from solders.pubkey import Pubkey
 
-# ===== CONFIG =====
-RPC_URL = "https://mainnet.helius-rpc.com/?api-key=afa7a395-7f7f-41aa-a5cb-90b81aae7290"
-BOT_TOKEN = "8779218583:AAGNpgOjvgJr9dw99rm4sY0wU3Uexpw5v9g"
-CHAT_ID = -1003795346383
+# ===== CONFIG FROM RAILWAY =====
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+RPC_URL = os.getenv("RPC_URL")
+CHAT_ID = int(os.getenv("CHAT_ID"))
 
 client = Client(RPC_URL)
-
-PUMPFUN_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hR7FzH3k8zFz3F5zJwJ6z"
 
 tracked_wallets = []
 seen_txs = set()
@@ -37,7 +36,7 @@ def get_token_name(mint):
     except:
         pass
 
-    return "Unknown Token"
+    return "Unknown"
 
 # ===== COMMAND HANDLER =====
 def handle_commands():
@@ -66,6 +65,7 @@ def handle_commands():
 
                 text = message.get("text", "")
 
+                # ===== /track =====
                 if text.startswith("/track"):
                     parts = text.split()
 
@@ -92,6 +92,7 @@ def handle_commands():
                     tracked_wallets.append(wallet)
                     send_message(f"✅ Tracking:\n{wallet_str}")
 
+                # ===== /remove =====
                 elif text.startswith("/remove"):
                     parts = text.split()
 
@@ -114,6 +115,7 @@ def handle_commands():
                     tracked_wallets.remove(wallet)
                     send_message(f"🗑 Removed:\n{wallet_str}")
 
+                # ===== /list =====
                 elif text == "/list":
                     if not tracked_wallets:
                         send_message("📭 No wallets")
@@ -128,35 +130,37 @@ def handle_commands():
 
         time.sleep(2)
 
-# ===== DETECT FEE CLAIM + TOKEN =====
+# ===== 🔥 CLAIM DETECTION (FIXED) =====
 def parse_fee_claim(tx_data, wallet):
     try:
         meta = tx_data.transaction.meta
         message = tx_data.transaction.transaction.message
 
-        # check pump.fun interaction
-        for ix in message.instructions:
-            if str(ix.program_id) == PUMPFUN_PROGRAM:
+        logs = meta.log_messages
 
-                # SOL change
-                pre = meta.pre_balances
-                post = meta.post_balances
-                keys = message.account_keys
+        if logs:
+            for log in logs:
+                if "claim" in log.lower():
 
-                for i, acc in enumerate(keys):
-                    if str(acc) == str(wallet):
-                        if post[i] > pre[i]:
-                            sol_amount = (post[i] - pre[i]) / 1e9
+                    pre = meta.pre_balances
+                    post = meta.post_balances
+                    keys = message.account_keys
 
-                            # 🔥 GET TOKEN CA
-                            if meta.post_token_balances:
-                                mint = meta.post_token_balances[0].mint
-                                token_name = get_token_name(mint)
-                            else:
+                    for i, acc in enumerate(keys):
+                        if str(acc) == str(wallet):
+                            diff = post[i] - pre[i]
+
+                            if diff > 0:
+                                sol_amount = diff / 1e9
+
                                 mint = "Unknown"
-                                token_name = "Unknown"
+                                name = "Unknown"
 
-                            return sol_amount, mint, token_name
+                                if meta.post_token_balances:
+                                    mint = meta.post_token_balances[0].mint
+                                    name = get_token_name(mint)
+
+                                return sol_amount, mint, name
 
     except:
         pass
@@ -195,7 +199,7 @@ def track_wallets():
                         sol, mint, name = result
 
                         send_message(
-                            f"💰 FEE CLAIM\n"
+                            f"💰 FEE CLAIM DETECTED\n"
                             f"Wallet: {wallet}\n"
                             f"Token: {name}\n"
                             f"CA: {mint}\n"
@@ -212,4 +216,4 @@ def track_wallets():
 threading.Thread(target=handle_commands).start()
 threading.Thread(target=track_wallets).start()
 
-print("🚀 Advanced Fee Bot Running...")
+print("🚀 Bot Running (Claim Detection Enabled)...")
