@@ -6,9 +6,10 @@ from solana.rpc.api import Client
 from solders.pubkey import Pubkey
 
 # ===== CONFIG FROM RAILWAY =====
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-RPC_URL = os.getenv("RPC_URL")
-CHAT_ID = int(os.getenv("CHAT_ID"))
+BOT_TOKEN = os.getenv("8779218583:AAGNpgOjvgJr9dw99rm4sY0wU3Uexpw5v9g")
+RPC_URL = os.getenv("https://mainnet.helius-rpc.com/?api-key=afa7a395-7f7f-41aa-a5cb-90b81aae7290")
+CHAT_ID = int(os.getenv("-1003795346383
+"))
 
 client = Client(RPC_URL)
 
