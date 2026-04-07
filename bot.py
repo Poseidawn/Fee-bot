@@ -11,7 +11,7 @@ RPC_URL = os.getenv("https://mainnet.helius-rpc.com/?api-key=afa7a395-7f7f-41aa-
 CHAT_ID = int(os.getenv("-1003795346383
 "))
 
-client = Client(RPC_URL)
+client = Client(https://mainnet.helius-rpc.com/?api-key=afa7a395-7f7f-41aa-a5cb-90b81aae7290)
 
 tracked_wallets = []
 seen_txs = set()
