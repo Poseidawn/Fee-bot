@@ -46,16 +46,12 @@ def handle_commands():
 
     while True:
         try:
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?offset={last_update_id + 1 if last_update_id else ''}"
             data = requests.get(url).json()
 
             for update in data["result"]:
                 update_id = update["update_id"]
-
-                if last_update_id and update_id <= last_update_id:
-                    continue
-
-                last_update_id = update_id
+                last_update_id = update_id  # 👈 VERY IMPORTANT
 
                 if "message" not in update:
                     continue
@@ -68,7 +64,6 @@ def handle_commands():
                 text = message.get("text", "")
                 print("Received:", text)
 
-                # ===== /track =====
                 if text.startswith("/track"):
                     parts = text.split()
 
@@ -88,14 +83,9 @@ def handle_commands():
                         send_message("⚠️ Already tracking")
                         continue
 
-                    if len(tracked_wallets) >= 10:
-                        send_message("⚠️ Max 10 wallets")
-                        continue
-
                     tracked_wallets.append(wallet)
                     send_message(f"✅ Tracking:\n{wallet_str}")
 
-                # ===== /remove =====
                 elif text.startswith("/remove"):
                     parts = text.split()
 
@@ -118,7 +108,6 @@ def handle_commands():
                     tracked_wallets.remove(wallet)
                     send_message(f"🗑 Removed:\n{wallet_str}")
 
-                # ===== /list =====
                 elif text == "/list":
                     if not tracked_wallets:
                         send_message("📭 No wallets")
