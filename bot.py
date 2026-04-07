@@ -1,17 +1,15 @@
 import time
 import requests
 import threading
-import os
 from solana.rpc.api import Client
 from solders.pubkey import Pubkey
 
-# ===== CONFIG FROM RAILWAY =====
-BOT_TOKEN = os.getenv("8779218583:AAGNpgOjvgJr9dw99rm4sY0wU3Uexpw5v9g")
-RPC_URL = os.getenv("https://mainnet.helius-rpc.com/?api-key=afa7a395-7f7f-41aa-a5cb-90b81aae7290")
-CHAT_ID = int(os.getenv("-1003795346383
-"))
+# ===== CONFIG =====
+RPC_URL = "https://mainnet.helius-rpc.com/?api-key=afa7a395-7f7f-41aa-a5cb-90b81aae7290"
+BOT_TOKEN = "8779218583:AAGNpgOjvgJr9dw99rm4sY0wU3Uexpw5v9g"
+CHAT_ID = -1003795346383
 
-client = Client(https://mainnet.helius-rpc.com/?api-key=afa7a395-7f7f-41aa-a5cb-90b81aae7290)
+client = Client(RPC_URL)
 
 tracked_wallets = []
 seen_txs = set()
@@ -19,29 +17,32 @@ last_update_id = None
 
 # ===== SEND MESSAGE =====
 def send_message(text):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, json={
-        "chat_id": CHAT_ID,
-        "text": text
-    })
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        requests.post(url, json={
+            "chat_id": CHAT_ID,
+            "text": text
+        })
+    except Exception as e:
+        print("Send error:", e)
 
 # ===== GET TOKEN NAME =====
 def get_token_name(mint):
     try:
         url = f"https://api.dexscreener.com/latest/dex/tokens/{mint}"
         data = requests.get(url).json()
-
         pairs = data.get("pairs", [])
         if pairs:
             return pairs[0]["baseToken"]["name"]
     except:
         pass
-
     return "Unknown"
 
 # ===== COMMAND HANDLER =====
 def handle_commands():
     global last_update_id
+
+    print("✅ Command handler started")
 
     while True:
         try:
@@ -65,6 +66,7 @@ def handle_commands():
                     continue
 
                 text = message.get("text", "")
+                print("Received:", text)
 
                 # ===== /track =====
                 if text.startswith("/track"):
@@ -126,12 +128,12 @@ def handle_commands():
                             msg += str(w) + "\n"
                         send_message(msg)
 
-        except:
-            pass
+        except Exception as e:
+            print("Command error:", e)
 
         time.sleep(2)
 
-# ===== 🔥 CLAIM DETECTION (FIXED) =====
+# ===== CLAIM DETECTION =====
 def parse_fee_claim(tx_data, wallet):
     try:
         meta = tx_data.transaction.meta
@@ -141,7 +143,7 @@ def parse_fee_claim(tx_data, wallet):
 
         if logs:
             for log in logs:
-                if "claim" in log.lower():
+                if "claim" in log.lower():  # flexible detection
 
                     pre = meta.pre_balances
                     post = meta.post_balances
@@ -163,13 +165,15 @@ def parse_fee_claim(tx_data, wallet):
 
                                 return sol_amount, mint, name
 
-    except:
-        pass
+    except Exception as e:
+        print("Parse error:", e)
 
     return None
 
 # ===== TRACKING =====
 def track_wallets():
+    print("🚀 Tracking started")
+
     while True:
         try:
             for wallet in tracked_wallets:
@@ -208,8 +212,8 @@ def track_wallets():
                             f"https://solscan.io/tx/{sig}"
                         )
 
-        except:
-            pass
+        except Exception as e:
+            print("Tracking error:", e)
 
         time.sleep(5)
 
@@ -217,4 +221,4 @@ def track_wallets():
 threading.Thread(target=handle_commands).start()
 threading.Thread(target=track_wallets).start()
 
-print("🚀 Bot Running (Claim Detection Enabled)...")
+print("🔥 BOT IS RUNNING...")
