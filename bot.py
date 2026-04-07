@@ -38,7 +38,7 @@ def get_token_name(mint):
         pass
     return "Unknown"
 
-# ===== COMMAND HANDLER =====
+# ===== COMMAND HANDLER (FIXED OFFSET) =====
 def handle_commands():
     global last_update_id
 
@@ -51,7 +51,7 @@ def handle_commands():
 
             for update in data["result"]:
                 update_id = update["update_id"]
-                last_update_id = update_id  # 👈 VERY IMPORTANT
+                last_update_id = update_id  # ✅ prevents repeating
 
                 if "message" not in update:
                     continue
@@ -64,6 +64,7 @@ def handle_commands():
                 text = message.get("text", "")
                 print("Received:", text)
 
+                # ===== /track =====
                 if text.startswith("/track"):
                     parts = text.split()
 
@@ -83,9 +84,14 @@ def handle_commands():
                         send_message("⚠️ Already tracking")
                         continue
 
+                    if len(tracked_wallets) >= 10:
+                        send_message("⚠️ Max 10 wallets")
+                        continue
+
                     tracked_wallets.append(wallet)
                     send_message(f"✅ Tracking:\n{wallet_str}")
 
+                # ===== /remove =====
                 elif text.startswith("/remove"):
                     parts = text.split()
 
@@ -108,6 +114,7 @@ def handle_commands():
                     tracked_wallets.remove(wallet)
                     send_message(f"🗑 Removed:\n{wallet_str}")
 
+                # ===== /list =====
                 elif text == "/list":
                     if not tracked_wallets:
                         send_message("📭 No wallets")
@@ -122,7 +129,7 @@ def handle_commands():
 
         time.sleep(2)
 
-# ===== CLAIM DETECTION =====
+# ===== 🔥 CLAIM DETECTION (ACCURATE) =====
 def parse_fee_claim(tx_data, wallet):
     try:
         meta = tx_data.transaction.meta
@@ -132,7 +139,10 @@ def parse_fee_claim(tx_data, wallet):
 
         if logs:
             for log in logs:
-                if "claim" in log.lower():  # flexible detection
+                log_lower = log.lower()
+
+                # 🎯 precise detection
+                if "claim_social_fee" in log_lower or "claim_social_fee_pda" in log_lower:
 
                     pre = meta.pre_balances
                     post = meta.post_balances
@@ -210,4 +220,4 @@ def track_wallets():
 threading.Thread(target=handle_commands).start()
 threading.Thread(target=track_wallets).start()
 
-print("🔥 BOT IS RUNNING...")
+print("🔥 BOT LIVE (PRO MODE)")
