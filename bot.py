@@ -12,7 +12,20 @@ CHAT_ID = -1003795346383
 
 client = Client(RPC_URL)
 
-tracked_wallets = []
+# ===== LOAD/SAVE WALLETS =====
+def load_wallets():
+    try:
+        with open("wallets.txt", "r") as f:
+            return [Pubkey.from_string(line.strip()) for line in f.readlines()]
+    except:
+        return []
+
+def save_wallets():
+    with open("wallets.txt", "w") as f:
+        for w in tracked_wallets:
+            f.write(str(w) + "\n")
+
+tracked_wallets = load_wallets()
 seen_txs = set()
 last_update_id = None
 
@@ -55,7 +68,7 @@ def get_parsed_tx(signature):
 
     return None
 
-# ===== COMMAND HANDLER (FIXED OFFSET) =====
+# ===== COMMAND HANDLER =====
 def handle_commands():
     global last_update_id
 
@@ -81,6 +94,7 @@ def handle_commands():
                 text = message.get("text", "")
                 print("Received:", text)
 
+                # ===== TRACK =====
                 if text.startswith("/track"):
                     parts = text.split()
 
@@ -105,8 +119,11 @@ def handle_commands():
                         continue
 
                     tracked_wallets.append(wallet)
+                    save_wallets()
+
                     send_message(f"✅ Tracking:\n{wallet_str}")
 
+                # ===== REMOVE =====
                 elif text.startswith("/remove"):
                     parts = text.split()
 
@@ -127,8 +144,11 @@ def handle_commands():
                         continue
 
                     tracked_wallets.remove(wallet)
+                    save_wallets()
+
                     send_message(f"🗑 Removed:\n{wallet_str}")
 
+                # ===== LIST =====
                 elif text == "/list":
                     if not tracked_wallets:
                         send_message("📭 No wallets")
@@ -143,7 +163,7 @@ def handle_commands():
 
         time.sleep(2)
 
-# ===== 🔥 FINAL CLAIM DETECTION =====
+# ===== CLAIM DETECTION =====
 def parse_fee_claim(signature, wallet):
     tx = get_parsed_tx(signature)
 
@@ -151,13 +171,11 @@ def parse_fee_claim(signature, wallet):
         return None
 
     try:
-        # ✅ RELIABLE detection
         tx_type = tx.get("type", "")
 
         if "CLAIM" not in tx_type.upper():
             return None
 
-        # ✅ SOL received
         for transfer in tx.get("nativeTransfers", []):
             if transfer.get("toUserAccount") == str(wallet):
 
@@ -177,7 +195,7 @@ def parse_fee_claim(signature, wallet):
 
     return None
 
-# ===== TRACKING =====
+# ===== TRACKING LOOP =====
 def track_wallets():
     print("🚀 Tracking started")
 
@@ -220,4 +238,4 @@ def track_wallets():
 threading.Thread(target=handle_commands).start()
 threading.Thread(target=track_wallets).start()
 
-print("🔥 BOT LIVE (HELIUS MODE)")
+print("🔥 BOT LIVE (FINAL VERSION)")
